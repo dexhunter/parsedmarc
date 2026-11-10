@@ -1,0 +1,60 @@
+[
+  {
+    "upstream_repo": "domainaware/parsedmarc",
+    "head_sha": "5c20eb80164535efaf9108d230a152fd4c7b5f07",
+    "file": "parsedmarc/__init__.py",
+    "function": "parse_aggregate_report_xml",
+    "native_test_cmd": "pytest tests/test_init.py::Test::testAggregateSamples tests/test_init.py::Test::testAggregateCsvNeutralizesFormulaInOrgName tests/test_init.py::Test::testAggregateCsvExposesASNColumns tests/test_init.py::Test::testParsedAggregateReportsToCsvRowsList -q",
+    "bench_cmd": "python osspr-intake/harness/bench_parse_aggregate.py",
+    "baseline_median_ms": 162.143138,
+    "baseline_noise_pct": 3.930562,
+    "tests_pass_on_baseline": true,
+    "workload": "One offline parse of samples/aggregate/!large-example.com!1711897200!1711983600.xml, a 909 KB aggregate report with 2,286 records, IP cache already warm.",
+    "notes": "On a valid report the function runs xmltodict.parse twice: a probe whose tree is discarded, then _parse_limited_xml after the header and schema rewrite. CPU time for _parse_limited_xml alone on this file is about 63 ms and the whole function is 162 ms, so the discarded probe is about 37% of the call. Parsing once, and recovering only when that parse fails, keeps the same AggregateReport for valid input. Open upstream PRs 950 and 951 edit _parse_report_record; PR 952 edits load_csv. baseline_noise_pct is (max-min)/median*100 across the five time.process_time runs."
+  },
+  {
+    "upstream_repo": "domainaware/parsedmarc",
+    "head_sha": "5c20eb80164535efaf9108d230a152fd4c7b5f07",
+    "file": "parsedmarc/utils.py",
+    "function": "get_ip_address_db_record",
+    "native_test_cmd": "pytest tests/test_utils.py::TestUtilsIpDbPaths -q",
+    "bench_cmd": "python osspr-intake/harness/bench_ip_db_record.py",
+    "baseline_median_ms": 200.821735,
+    "baseline_noise_pct": 0.98783,
+    "tests_pass_on_baseline": true,
+    "workload": "One get_ip_address_db_record call per source IP from that 2,286-record aggregate report (2,286 distinct addresses) against the bundled ipinfo_lite.mmdb.",
+    "notes": "The function calls maxminddb.open_database on every lookup and drops the reader when the call returns. These 2,286 addresses take 200.8 ms of CPU time; the same gets on one already-open reader take about 3 ms. Keeping a reader for an unchanged database path is a local change and returns the same country and ASN fields. TestUtilsIpDbPaths covers the bundled record, path fallback, and the staleness warning. baseline_noise_pct is (max-min)/median*100 across the five time.process_time runs."
+  },
+  {
+    "upstream_repo": "domainaware/parsedmarc",
+    "head_sha": "5c20eb80164535efaf9108d230a152fd4c7b5f07",
+    "file": "parsedmarc/__init__.py",
+    "function": "parsed_aggregate_reports_to_csv",
+    "native_test_cmd": "pytest tests/test_init.py::Test::testAggregateSamples tests/test_init.py::Test::testAggregateCsvNeutralizesFormulaInOrgName tests/test_init.py::Test::testAggregateCsvExposesASNColumns tests/test_init.py::Test::testParsedAggregateReportsToCsvRowsList -q",
+    "bench_cmd": "python osspr-intake/harness/bench_csv_peak_mem.py",
+    "metric_kind": "peak_memory_bytes",
+    "baseline_value": 5240411,
+    "baseline_noise_pct": 0.000611,
+    "metric_benchmark": "python osspr-intake/harness/bench_csv_peak_mem.py",
+    "labeled_data": null,
+    "tests_pass_on_baseline": true,
+    "workload": "parsed_aggregate_reports_to_csv on the parsed form of the bundled 2,286-record aggregate report.",
+    "notes": "The function keeps every flat row dict, builds a second dict per row for _csv_safe, and holds both until the StringIO is finished. tracemalloc peak during the call is 5240411 bytes; the returned CSV is 649541 bytes. Writing each row and releasing it, passing _csv_safe values through without a second dict, leaves the CSV text unchanged and brings the peak down toward the output buffer. testAggregateSamples runs this conversion on every bundled aggregate sample, including the large report. baseline_noise_pct is (max-min)/median*100 of the five tracemalloc peaks."
+  },
+  {
+    "upstream_repo": "domainaware/parsedmarc",
+    "head_sha": "5c20eb80164535efaf9108d230a152fd4c7b5f07",
+    "file": "parsedmarc/__init__.py",
+    "function": "parse_aggregate_report_xml",
+    "native_test_cmd": "pytest tests/test_init.py::Test::testAggregateSamples tests/test_init.py::Test::testAggregateCsvNeutralizesFormulaInOrgName tests/test_init.py::Test::testAggregateCsvExposesASNColumns tests/test_init.py::Test::testParsedAggregateReportsToCsvRowsList -q",
+    "bench_cmd": "python osspr-intake/harness/bench_parse_allocs.py",
+    "metric_kind": "allocations",
+    "baseline_value": 1087939,
+    "baseline_noise_pct": 0.0,
+    "metric_benchmark": "python osspr-intake/harness/bench_parse_allocs.py",
+    "labeled_data": null,
+    "tests_pass_on_baseline": true,
+    "workload": "One warm offline parse of the same 2,286-record aggregate report; the count is PYMEM_DOMAIN_OBJ allocations inside the call.",
+    "notes": "Same discarded probe parse as the runtime entry, counted as PYMEM_DOMAIN_OBJ malloc+calloc+realloc. All five runs allocate exactly 1087939 objects. _parse_limited_xml alone is about 445500 of those, and that tree is freed before the function returns, so skipping the probe on valid input removes about 41% of the allocations and keeps the parsed report. The harness compiles osspr-intake/harness/alloccount.c with gcc and the running interpreter's headers. baseline_noise_pct is (max-min)/median*100; the five counts are identical."
+  }
+]
